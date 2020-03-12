@@ -13,10 +13,22 @@ COPY haystack /home/user/haystack
 # copy saved FARM models
 COPY models /home/user/models
 
-# copy sqlite db if needed for testing
+# Optional: copy sqlite db if needed for testing
 #COPY qa.db /home/user/
 
 EXPOSE 8000
+
+
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+
+# Default config via environment variables (you can still change this at runtime)
+ENV DB_HOST=127.0.0.1
+ENV DB_USER=""
+ENV DB_PW=""
+ENV DB_INDEX="document"
+# either local path in container or remote name if you want to pull it at container start
+ENV MODEL_PATH=deepset/bert-base-cased-squad2
 
 # cmd for running the API
 CMD ["uvicorn", "haystack.api.inference:app", "--host", "0.0.0.0", "--port", "8000"]
