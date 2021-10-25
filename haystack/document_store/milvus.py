@@ -12,7 +12,6 @@ from haystack import Document
 from haystack.document_store.sql import SQLDocumentStore
 from haystack.retriever.base import BaseRetriever
 from haystack.utils import get_batches_from_generator
-from haystack.document_store.base import DuplicateDocumentError
 
 logger = logging.getLogger(__name__)
 
