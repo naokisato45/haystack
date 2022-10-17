@@ -16,9 +16,18 @@
 from typing import Dict, Any, Union, Tuple, Optional, List
 
 import re
+import os
+import json
 import logging
+from pathlib import Path
+
 import numpy as np
-from transformers import AutoTokenizer, PreTrainedTokenizer, RobertaTokenizer
+import transformers
+from transformers import PreTrainedTokenizer, RobertaTokenizer, AutoConfig, AutoFeatureExtractor, AutoTokenizer
+
+# NOTE: These two constants are internals of HF. Keep in mind that they might be renamed or removed at any time.
+from transformers.models.auto.feature_extraction_auto import FEATURE_EXTRACTOR_MAPPING_NAMES
+from transformers.models.auto.tokenization_auto import TOKENIZER_MAPPING_NAMES
 
 from haystack.errors import ModelingError
 from haystack.modeling.data_handler.samples import SampleBasket
@@ -31,45 +40,103 @@ logger = logging.getLogger(__name__)
 SPECIAL_TOKENIZER_CHARS = r"^(##|Ġ|▁)"
 
 
-def get_tokenizer(
-    pretrained_model_name_or_path: str,
-    revision: str = None,
-    use_fast: bool = True,
-    use_auth_token: Optional[Union[str, bool]] = None,
-    **kwargs,
-) -> PreTrainedTokenizer:
-    """
-    Enables loading of different Tokenizer classes with a uniform interface.
-    Right now it always returns an instance of `AutoTokenizer`.
+FEATURE_EXTRACTORS = {
+    **{key: AutoTokenizer for key in TOKENIZER_MAPPING_NAMES.keys()},
+    **{key: AutoFeatureExtractor for key in FEATURE_EXTRACTOR_MAPPING_NAMES.keys()},
+}
 
-    :param pretrained_model_name_or_path:  The path of the saved pretrained model or its name (e.g. `bert-base-uncased`)
-    :param revision: The version of model to use from the HuggingFace model hub. Can be tag name, branch name, or commit hash.
-    :param use_fast: Indicate if Haystack should try to load the fast version of the tokenizer (True) or use the Python one (False). Defaults to True.
-    :param use_auth_token: The API token used to download private models from Huggingface.
-                           If this parameter is set to `True`, then the token generated when running
-                           `transformers-cli login` (stored in ~/.huggingface) will be used.
-                           Additional information can be found here
-                           https://huggingface.co/transformers/main_classes/model.html#transformers.PreTrainedModel.from_pretrained
-    :param kwargs: other kwargs to pass on to `PretrainedTokenizer.from_pretrained()`
-    :return: AutoTokenizer instance
-    """
-    model_name_or_path = str(pretrained_model_name_or_path)
 
-    if "mlm" in model_name_or_path.lower():
-        logging.error("MLM part of codebert is currently not supported in Haystack. Proceed at your own risk.")
+DEFAULT_EXTRACTION_PARAMS = {
+    AutoTokenizer: {
+        "max_length": 256,
+        "add_special_tokens": True,
+        "truncation": True,
+        "truncation_strategy": "longest_first",
+        "padding": "max_length",
+        "return_token_type_ids": True,
+    },
+    AutoFeatureExtractor: {"return_tensors": "pt"},
+}
 
-    params = {}
-    if any(tokenizer_type in model_name_or_path for tokenizer_type in ["albert", "xlnet"]):
-        params["keep_accents"] = True
 
-    return AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path=model_name_or_path,
-        revision=revision,
-        use_fast=use_fast,
-        use_auth_token=use_auth_token,
-        **params,
+class FeatureExtractor:
+    def __init__(
+        self,
+        pretrained_model_name_or_path: Union[str, Path],
+        revision: str = None,
+        use_fast: bool = True,
+        use_auth_token: Optional[Union[str, bool]] = None,
         **kwargs,
-    )
+    ):
+        """
+        Enables loading of different feature extractors, including tokenizers, with a uniform interface.
+
+        Use `FeatureExtractor.extract_features()` to convert your input queries, documents, images, and tables
+        into vectors that you can pass to the language model.
+
+        :param pretrained_model_name_or_path:  The path of the saved pretrained model or its name (for example, `bert-base-uncased`)
+        :param revision: The version of the model to use from the Hugging Face model hub. It can be tag name, branch name, or commit hash.
+        :param use_fast: Indicate if Haystack should try to load the fast version of the tokenizer (True) or use the Python one (False). Defaults to True.
+        :param use_auth_token: The API token used to download private models from Hugging Face.
+                            If this parameter is set to `True`, then the token generated when running
+                            `transformers-cli login` (stored in ~/.huggingface) is used.
+                            For more information, see
+                            [Hugging Face documentation](https://huggingface.co/transformers/main_classes/model.html#transformers.PreTrainedModel.from_pretrained)
+        :param kwargs: Other kwargs you want to pass on to `PretrainedTokenizer.from_pretrained()`
+        """
+        model_name_or_path = str(pretrained_model_name_or_path)
+        model_type = None
+
+        config_file = Path(pretrained_model_name_or_path) / "tokenizer_config.json"
+        if os.path.exists(config_file):
+            # it's a local directory
+            config = json.load(open(config_file))
+            feature_extractor_classname = config["tokenizer_class"]
+            logger.debug(f"⛏️ Selected feature extractor: {feature_extractor_classname} (from {config_file})")
+            # Use FastTokenizers as much as possible
+            try:
+                feature_extractor_class = getattr(transformers, feature_extractor_classname + "Fast")
+                logger.debug(
+                    "Fast version of this tokenizer exists. Loaded class: %s",
+                    feature_extractor_class.__class__.__name__,
+                )
+            except AttributeError:
+                logger.debug("Fast version could not be loaded. Falling back to base version.")
+                feature_extractor_class = getattr(transformers, feature_extractor_classname)
+
+        else:
+            # it's a HF Hub identifier
+            config = AutoConfig.from_pretrained(
+                pretrained_model_name_or_path=model_name_or_path, use_auth_token=use_auth_token, revision=revision
+            )
+            model_type = config.model_type
+            try:
+                feature_extractor_class = FEATURE_EXTRACTORS[model_type]
+            except KeyError as e:
+                raise ModelingError(
+                    f"'{pretrained_model_name_or_path}' has no known feature extractor. "
+                    "Haystack can assign tokenizers to the following model types: "
+                    # Using chr(10) instead of \n due to f-string limitation
+                    # https://peps.python.org/pep-0498/#specification: "Backslashes may not appear anywhere within expressions"
+                    f"\n- {f'{chr(10)}- '.join(FEATURE_EXTRACTORS.keys())}"
+                ) from e
+            logger.debug(
+                f"⛏️ Selected feature extractor: {feature_extractor_class.__name__} (for model type '{model_type}')"
+            )
+
+        self.default_params = DEFAULT_EXTRACTION_PARAMS.get(feature_extractor_class, {})
+
+        self.feature_extractor = feature_extractor_class.from_pretrained(
+            pretrained_model_name_or_path=model_name_or_path,
+            revision=revision,
+            use_fast=use_fast,
+            use_auth_token=use_auth_token,
+            **kwargs,
+        )
+
+    def __call__(self, **kwargs):
+        params = {**self.default_params, **(kwargs or {})}
+        return self.feature_extractor(**params)
 
 
 def tokenize_batch_question_answering(
@@ -101,7 +168,11 @@ def tokenize_batch_question_answering(
     # # Tokenize texts in batch mode
     texts = [d["context"] for d in pre_baskets]
     tokenized_docs_batch = tokenizer(
-        texts, return_offsets_mapping=True, return_special_tokens_mask=True, add_special_tokens=False, verbose=False
+        text=texts,
+        return_offsets_mapping=True,
+        return_special_tokens_mask=True,
+        add_special_tokens=False,
+        verbose=False,
     )
 
     # Extract relevant data
