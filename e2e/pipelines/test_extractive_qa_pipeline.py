@@ -1,9 +1,9 @@
 import json
 
-from haystack.preview import Pipeline, Document
-from haystack.preview.document_stores import InMemoryDocumentStore
-from haystack.preview.components.retrievers import InMemoryBM25Retriever
-from haystack.preview.components.readers import ExtractiveReader
+from haystack import Pipeline, Document
+from haystack.document_stores import InMemoryDocumentStore
+from haystack.components.retrievers import InMemoryBM25Retriever
+from haystack.components.readers import ExtractiveReader
 
 
 def test_extractive_qa_pipeline(tmp_path):

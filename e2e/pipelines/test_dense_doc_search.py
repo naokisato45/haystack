@@ -1,14 +1,13 @@
 import json
-from pathlib import Path
 
-from haystack.preview import Pipeline
-from haystack.preview.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
-from haystack.preview.components.converters import PyPDFToDocument, TextFileToDocument
-from haystack.preview.components.preprocessors import DocumentCleaner, DocumentSplitter
-from haystack.preview.components.routers import FileTypeRouter, DocumentJoiner
-from haystack.preview.components.writers import DocumentWriter
-from haystack.preview.document_stores import InMemoryDocumentStore
-from haystack.preview.components.retrievers import InMemoryEmbeddingRetriever
+from haystack import Pipeline
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
+from haystack.components.converters import PyPDFToDocument, TextFileToDocument
+from haystack.components.preprocessors import DocumentCleaner, DocumentSplitter
+from haystack.components.routers import FileTypeRouter, DocumentJoiner
+from haystack.components.writers import DocumentWriter
+from haystack.document_stores import InMemoryDocumentStore
+from haystack.components.retrievers import InMemoryEmbeddingRetriever
 
 
 def test_dense_doc_search_pipeline(tmp_path, samples_path):
@@ -51,7 +50,7 @@ def test_dense_doc_search_pipeline(tmp_path, samples_path):
     with open(tmp_path / "test_dense_doc_search_indexing_pipeline.json", "r") as f:
         indexing_pipeline = Pipeline.from_dict(json.load(f))
 
-    indexing_result = indexing_pipeline.run({"file_type_router": {"sources": samples_path.iterdir()}})
+    indexing_result = indexing_pipeline.run({"file_type_router": {"sources": list(samples_path.iterdir())}})
     filled_document_store = indexing_pipeline.get_component("writer").document_store
 
     assert indexing_result["writer"]["documents_written"] == 2

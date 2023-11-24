@@ -2,14 +2,14 @@ import os
 import json
 import pytest
 
-from haystack.preview import Pipeline, Document
-from haystack.preview.document_stores import InMemoryDocumentStore
-from haystack.preview.components.writers import DocumentWriter
-from haystack.preview.components.retrievers import InMemoryBM25Retriever, InMemoryEmbeddingRetriever
-from haystack.preview.components.embedders import SentenceTransformersTextEmbedder, SentenceTransformersDocumentEmbedder
-from haystack.preview.components.generators import GPTGenerator
-from haystack.preview.components.builders.answer_builder import AnswerBuilder
-from haystack.preview.components.builders.prompt_builder import PromptBuilder
+from haystack import Pipeline, Document
+from haystack.document_stores import InMemoryDocumentStore
+from haystack.components.writers import DocumentWriter
+from haystack.components.retrievers import InMemoryBM25Retriever, InMemoryEmbeddingRetriever
+from haystack.components.embedders import SentenceTransformersTextEmbedder, SentenceTransformersDocumentEmbedder
+from haystack.components.generators import GPTGenerator
+from haystack.components.builders.answer_builder import AnswerBuilder
+from haystack.components.builders.prompt_builder import PromptBuilder
 
 
 @pytest.mark.skipif(

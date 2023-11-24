@@ -1,13 +1,13 @@
 import json
 
-from haystack.preview import Pipeline
-from haystack.preview.components.embedders import SentenceTransformersDocumentEmbedder
-from haystack.preview.components.converters import TextFileToDocument
-from haystack.preview.components.preprocessors import DocumentSplitter, DocumentCleaner
-from haystack.preview.components.classifiers import DocumentLanguageClassifier
-from haystack.preview.components.routers import FileTypeRouter, MetadataRouter
-from haystack.preview.components.writers import DocumentWriter
-from haystack.preview.document_stores import InMemoryDocumentStore
+from haystack import Pipeline
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder
+from haystack.components.converters import TextFileToDocument
+from haystack.components.preprocessors import DocumentSplitter, DocumentCleaner
+from haystack.components.classifiers import DocumentLanguageClassifier
+from haystack.components.routers import FileTypeRouter, MetadataRouter
+from haystack.components.writers import DocumentWriter
+from haystack.document_stores import InMemoryDocumentStore
 
 
 def test_preprocessing_pipeline(tmp_path):

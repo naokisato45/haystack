@@ -1,11 +1,11 @@
 import json
 
-from haystack.preview import Pipeline, Document
-from haystack.preview.components.embedders import SentenceTransformersTextEmbedder
-from haystack.preview.components.rankers import TransformersSimilarityRanker
-from haystack.preview.components.routers.document_joiner import DocumentJoiner
-from haystack.preview.document_stores import InMemoryDocumentStore
-from haystack.preview.components.retrievers import InMemoryBM25Retriever, InMemoryEmbeddingRetriever
+from haystack import Pipeline, Document
+from haystack.components.embedders import SentenceTransformersTextEmbedder
+from haystack.components.rankers import TransformersSimilarityRanker
+from haystack.components.routers.document_joiner import DocumentJoiner
+from haystack.document_stores import InMemoryDocumentStore
+from haystack.components.retrievers import InMemoryBM25Retriever, InMemoryEmbeddingRetriever
 
 
 def test_hybrid_doc_search_pipeline(tmp_path):
