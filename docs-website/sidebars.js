@@ -27,7 +27,17 @@ export default {
       label: 'Haystack Concepts',
       items: [
         'concepts/concepts-overview',
-        'concepts/agents',
+        {
+          type: 'category',
+          label: 'Agents',
+          link: {
+            type: 'doc',
+            id: 'concepts/agents'
+          },
+          items: [
+            'concepts/agents/multi-agent-systems',
+          ],
+        },
         {
           type: 'category',
           label: 'Components',
